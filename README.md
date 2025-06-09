@@ -27,7 +27,10 @@ UFM(UniFlowMatch) is a simple, end-to-end trained transformer model that directl
 First, recursively clone this repository and install the dependencies and the `UniCeption` library. It is a library contains modular, config-swappable components for assembling end-to-end vision networks.  
 
 ```
-git clone --recursively https://github.com/UniFlowMatch/UFM.git
+git clone --recursive https://github.com/UniFlowMatch/UFM.git
+
+# In case you cloned without --recirsive:
+# git submodule update --init
 
 conda create -n ufm python=3.11 -y
 conda activate ufm
@@ -48,7 +51,7 @@ Then, verify your install by running
 python uniflowmatch/models/ufm.py
 ```
 
-Verify that `ufm_output.png` looks like `example_ufm_output.png`.
+Verify that `ufm_output.png` looks like `example/example_ufm_output.png`.
 
 ## Interactive Demo
 

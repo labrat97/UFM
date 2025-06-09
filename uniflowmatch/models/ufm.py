@@ -1105,13 +1105,9 @@ if __name__ == "__main__":
     USE_REFINEMENT_MODEL = False
 
     if USE_REFINEMENT_MODEL:
-        model = UniFlowMatchClassificationRefinement.from_pretrained(
-            "infinity1096/UFM-Refine"
-        )
+        model = UniFlowMatchClassificationRefinement.from_pretrained("infinity1096/UFM-Refine")
     else:
-        model = UniFlowMatchConfidence.from_pretrained(
-            "infinity1096/UFM-Base"
-        )
+        model = UniFlowMatchConfidence.from_pretrained("infinity1096/UFM-Base")
 
     # === Load and Prepare Images ===
     source_path = "examples/image_pairs/fire_academy_0.png"
