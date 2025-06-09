@@ -7,3 +7,4 @@ opencv-python
 flow_vis
 huggingface_hub
 einops
+gradio
