@@ -2,7 +2,7 @@
 <div align="center">
 <h1>UFM: A Simple Path towards Unified Dense Correspondence with Flow</h1>
 
-<a href="https://arxiv.org/abs/0000.00000"><img src="https://img.shields.io/badge/arXiv-2503.11651-b31b1b" alt="arXiv"></a>
+<a href="https://arxiv.org/abs/0000.00000"><img src="https://img.shields.io/badge/arXiv-0000.00000-b31b1b" alt="arXiv"></a>
 <a href="https://uniflowmatch.github.io/"><img src="https://img.shields.io/badge/Project_Page-green" alt="Project Page"></a>
 <a href='https://huggingface.co/spaces/infinity1096/UFM'><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue'></a>
 
@@ -28,6 +28,7 @@ First, recursively clone this repository and install the dependencies and the `U
 
 ```
 git clone --recursive https://github.com/UniFlowMatch/UFM.git
+cd UFM
 
 # In case you cloned without --recirsive:
 # git submodule update --init
