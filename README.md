@@ -13,7 +13,7 @@
 </div>
 
 <p align="center">
-    <img src="assets/teaser.jpg" alt="example" width=60%>
+    <img src="assets/teaser.jpg" alt="example" width=80%>
     <br>
     <em>UFM unifies the tasks of Optical Flow Estimation and Wide Baseline Matching and provides accurate dense correspondences for in-the-wild images at significantly fast inference speeds.</em>
 </p>
