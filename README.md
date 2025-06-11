@@ -20,7 +20,7 @@
 
 ## Updates
 - [2025/06/10] UFM training and benchmarking code coming soon! Star the repository to get notified when we release it.
-- [2025/06/10] Initial release of model checkpoint and inference code. 
+- [2025/06/10] Initial release of model checkpoint and inference code.
 
 ## Overview
 
@@ -55,6 +55,9 @@ pip install -e .
 # pip install -e ".[dev]"     # For development
 # pip install -e ".[demo]"    # For demo
 # pip install -e ".[all]"     # All optional dependencies
+
+# Optional: For development and linting
+pre-commit install  # Install pre-commit hooks
 ```
 
 ### Verify Installation
@@ -118,7 +121,7 @@ with torch.no_grad():
         source_image=source_image,
         target_image=target_image,
     )
-    
+
     flow = result.flow.flow_output[0].cpu().numpy()
     covisibility = result.covisibility.mask[0].cpu().numpy()
 ```
