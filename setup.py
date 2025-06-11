@@ -12,7 +12,7 @@ except FileNotFoundError:
 # Core dependencies
 install_requires = [
     "torch",
-    "torchvision", 
+    "torchvision",
     "torchaudio",
     "numpy",
     "matplotlib",
@@ -32,7 +32,7 @@ install_requires = [
 extras_require = {
     "dev": [
         "black",
-        "isort", 
+        "isort",
         "pre-commit",
         "pytest",
     ],
@@ -42,7 +42,7 @@ extras_require = {
     "all": [
         "black",
         "isort",
-        "pre-commit", 
+        "pre-commit",
         "pytest",
         "gradio",
     ],
