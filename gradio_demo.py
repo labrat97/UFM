@@ -1,3 +1,11 @@
+"""
+Gradio demo for UFM models
+This script provides a Gradio interface to visualize UFM outputs.
+It supports both the base model and the refinement model.
+This demo allows users to upload two images and see the flow visualization,
+covisibility mask, and warped image.
+"""
+
 import cv2
 import flow_vis
 import gradio as gr
@@ -180,7 +188,8 @@ def create_demo():
     return demo
 
 
-if __name__ == "__main__":
+def main():
+    """Main function for running the Gradio demo."""
     # Initialize model
     print("Initializing UniFlowMatch model...")
     model_loaded = initialize_model(use_refinement=False)  # Start with base model
@@ -201,3 +210,7 @@ if __name__ == "__main__":
         server_port=7860,  # Default Gradio port
         show_error=True,
     )
+
+
+if __name__ == "__main__":
+    main()

@@ -1,3 +1,7 @@
+"""
+UFM (Unified Flow & Matching) model for dense correspondence prediction between two views.
+"""
+
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -39,9 +43,18 @@ CLASSNAME_TO_ADAPTOR_CLASS = {
 }
 
 
-# dust3r data structure for reducing passing duplicate images through the encoder
 def is_symmetrized(gt1, gt2):
-    "Function to check if input pairs are symmetrized, i.e., (a, b) and (b, a) always exist in the input"
+    """
+    Function to check if input pairs are symmetrized, i.e., (a, b) and (b, a) always exist in the input.
+    Reference: DUSt3R
+    
+    Args:
+        gt1 (Dict[str, Any]): First ground truth data containing 'instance' key
+        gt2 (Dict[str, Any]): Second ground truth data containing 'instance' key
+    
+    Returns:
+        bool: True if the input pairs are symmetrized, False otherwise
+    """
     x = gt1["instance"]
     y = gt2["instance"]
     if len(x) == len(y) and len(x) == 1:
@@ -54,7 +67,16 @@ def is_symmetrized(gt1, gt2):
 
 
 def interleave(tensor1, tensor2):
-    "Interleave two tensors along the first dimension (used to avoid redundant encoding for symmetrized pairs)"
+    """
+    Interleave two tensors along the first dimension (used to avoid redundant encoding for symmetrized pairs).
+    
+    Args:
+        tensor1 (torch.Tensor): First input tensor
+        tensor2 (torch.Tensor): Second input tensor
+        
+    Returns:
+        Tuple[torch.Tensor, torch.Tensor]: Two interleaved tensors (tensor1, tensor2) and (tensor2, tensor1)
+    """
     res1 = torch.stack((tensor1, tensor2), dim=1).flatten(0, 1)
     res2 = torch.stack((tensor2, tensor1), dim=1).flatten(0, 1)
     return res1, res2
@@ -97,7 +119,12 @@ def modify_state_dict(original_state_dict, mappings):
 
 class UniFlowMatch(UniFlowMatchModelsBase, PyTorchModelHubMixin):
     """
-    UniFlowMatch model.
+    UniFlowMatch model for dense correspondence prediction between two views.
+    
+    This is the base model that performs multi-view feature extraction, information sharing,
+    and correspondence prediction between image pairs. It combines a feature encoder with
+    an information sharing module and prediction heads to output dense flow fields and
+    optional covisibility masks.
     """
 
     def __init__(
@@ -110,7 +137,7 @@ class UniFlowMatch(UniFlowMatchModelsBase, PyTorchModelHubMixin):
         # Information sharing configurations
         info_sharing_str: str = "global_attention",
         info_sharing_kwargs: Dict[str, Any] = {},
-        # skip-connections between encoder and info-sharing
+        # Skip-connections between encoder and info-sharing
         encoder_skip_connection: Optional[List[int]] = None,
         info_sharing_skip_connection: Optional[List[int]] = None,
         # Prediction Heads & Adaptors
@@ -120,23 +147,30 @@ class UniFlowMatch(UniFlowMatchModelsBase, PyTorchModelHubMixin):
         # Load Pretrained Weights
         pretrained_checkpoint_path: Optional[str] = None,
         # Inference Settings
-        inference_resolution: Optional[Tuple[int, int]] = (560, 420),  # WH
+        inference_resolution: Optional[Tuple[int, int]] = (560, 420),  # (W, H)
         *args,
         **kwargs,
     ):
         """
-        Initialize the UniFlowMarch Model
+        Initialize the UniFlowMatch Model.
 
-        - encoder_str (str): Encoder string
-        - encoder_kwargs (Dict[str, Any]): Encoder configurations
-
-        - info_sharing_and_head_structure (str): Info sharing and head structure configurations
-            - "dual+single": Dual view info sharing and single view prediction head
-
-        - info_sharing_str (str): Info sharing method
-            - "global_attention_transformer": Global attention transformer
-        - info_sharing_kwargs (Dict[str, Any]): Info sharing configurations
-
+        Args:
+            encoder_str (str): Encoder identifier string
+            encoder_kwargs (Dict[str, Any]): Encoder configuration parameters
+            info_sharing_and_head_structure (str): Info sharing and head structure type.
+                Currently only "dual+single" is supported (dual view info sharing and single view prediction head)
+            info_sharing_str (str): Info sharing method identifier. 
+                Supported: "global_attention_transformer", "global_attention"
+            info_sharing_kwargs (Dict[str, Any]): Info sharing module configuration parameters
+            encoder_skip_connection (Optional[List[int]]): Skip connection indices from encoder
+            info_sharing_skip_connection (Optional[List[int]]): Skip connection indices from info sharing
+            head_type (str): Prediction head type. Supported: "dpt", "moge_conv"
+            feature_head_kwargs (Dict[str, Any]): Feature head configuration parameters
+            adaptors_kwargs (Dict[str, Any]): Adaptors configuration parameters
+            pretrained_checkpoint_path (Optional[str]): Path to pretrained model checkpoint
+            inference_resolution (Optional[Tuple[int, int]]): Target resolution for inference (W, H)
+            *args: Additional arguments passed to parent classes
+            **kwargs: Additional keyword arguments passed to parent classes
         """
         UniFlowMatchModelsBase.__init__(self, inference_resolution=inference_resolution, *args, **kwargs)
 
@@ -184,74 +218,22 @@ class UniFlowMatch(UniFlowMatchModelsBase, PyTorchModelHubMixin):
 
     @classmethod
     def from_pretrained_ckpt(cls, pretrained_model_name_or_path, strict=True, **kw):
+        """
+        Load a model from a pretrained checkpoint file.
+        
+        Args:
+            pretrained_model_name_or_path (str): Path to the pretrained model checkpoint file
+            strict (bool): Whether to strictly enforce that the keys in state_dict match exactly
+            **kw: Additional keyword arguments
+            
+        Returns:
+            UniFlowMatch: Loaded model instance
+            
+        Raises:
+            ValueError: If the pretrained model file is not found
+        """
         if os.path.isfile(pretrained_model_name_or_path):
             ckpt = torch.load(pretrained_model_name_or_path, map_location="cpu")
-
-            # remove base_pretrained_checkpoint_path from the model args
-            if "base_pretrained_checkpoint_path" in ckpt["model_args"]:
-                ckpt["model_args"].pop("base_pretrained_checkpoint_path")
-
-            # convert old model args into new definition
-            if "img_size" in ckpt["model_args"]:
-                # we are loading from a old benchmark checkpoint
-                print("Converting from a old benchmark checkpoint")
-                model_args = {
-                    # Encoder args
-                    "encoder_str": ckpt["model_args"]["encoder_str"],
-                    "encoder_kwargs": ckpt["model_args"]["encoder_kwargs"],
-                    # Info-sharing args
-                    "info_sharing_and_head_structure": "dual+single",
-                    "info_sharing_str": ckpt["model_args"]["info_sharing_type"],
-                    "info_sharing_kwargs": {
-                        "name": "info_sharing",
-                        "input_embed_dim": ckpt["model_args"]["input_embed_dim"],
-                        "num_views": 2,
-                        "use_rand_idx_pe_for_non_reference_views": False,
-                        "depth": ckpt["model_args"]["num_layers"],
-                        "dim": ckpt["model_args"]["transformer_dim"],
-                        "num_heads": ckpt["model_args"]["num_heads"],
-                        "mlp_ratio": ckpt["model_args"]["mlp_ratio"],
-                        "qkv_bias": ckpt["model_args"]["qkv_bias"],
-                        "qk_norm": ckpt["model_args"]["qk_norm"],
-                        "custom_positional_encoding": ckpt["model_args"]["position_encoding"],
-                        "norm_intermediate": ckpt["model_args"]["normalize_intermediate"],
-                        "indices": ckpt["model_args"]["returned_intermediate_layers"],
-                    },
-                    # flow head args
-                    "head_type": "dpt",
-                    "feature_head_kwargs": ckpt["model_args"]["feature_head_kwargs"],
-                    "adaptors_kwargs": ckpt["model_args"]["adaptors_kwargs"],
-                }
-
-                if "covocc_feature_head_kwargs" in ckpt["model_args"]:
-                    # if the model has a covocc head, we need to convert it to the new format
-                    model_args["uncertainty_head_type"] = "dpt"
-                    model_args["uncertainty_head_kwargs"] = {
-                        "dpt_feature": ckpt["model_args"]["covocc_feature_head_kwargs"]["dpt_feature"],
-                        "dpt_processor": ckpt["model_args"]["covocc_feature_head_kwargs"]["dpt_regr_processor"],
-                    }
-                    model_args["uncertainty_adaptors_kwargs"] = {
-                        "flow_cov": ckpt["model_args"]["covocc_adaptors_kwargs"]["flow_cov"]
-                    }
-
-                ckpt["model_args"] = model_args
-
-                # Update the old weights into the current format
-                ckpt["model"] = modify_state_dict(
-                    ckpt["model"],
-                    {
-                        "covocc_head.dpt_feature": "uncertainty_head.0.0",
-                        "covocc_head.dpt_regr_processor": "uncertainty_head.0.1",
-                        "covocc_head.dpt_segm_processor": None,
-                        "feature_matching_proj": None,
-                        "encoder.model.mask_token": None,
-                    },
-                )
-
-            # remove the ket "pretrained_backbone_checkpoint_path" from the model args
-            if "pretrained_backbone_checkpoint_path" in ckpt["model_args"]:
-                ckpt["model_args"].pop("pretrained_backbone_checkpoint_path")
-
             model = cls(**ckpt["model_args"])
             model.load_state_dict(ckpt["model"], strict=strict)
             return model
@@ -262,15 +244,18 @@ class UniFlowMatch(UniFlowMatchModelsBase, PyTorchModelHubMixin):
         self, head_type: str, feature_head_kwargs: Dict[str, Any], adaptors_kwargs: Dict[str, Any]
     ):
         """
-        Initialize prediction heads and adaptors
+        Initialize prediction heads and adaptors.
 
         Args:
-        - head_type (str): Head type, either "dpt" or "linear"
-        - feature_head_kwargs (Dict[str, Any]): Feature head configurations
-        - adaptors_kwargs (Dict[str, Any]): Adaptors configurations
+            head_type (str): Head type, supported: "dpt", "moge_conv"
+            feature_head_kwargs (Dict[str, Any]): Feature head configuration parameters
+            adaptors_kwargs (Dict[str, Any]): Adaptors configuration parameters
 
         Returns:
-        - nn.Module: output head + adaptors
+            nn.Module: Sequential module containing feature processor and adaptor map
+            
+        Raises:
+            ValueError: If unsupported head type is specified
         """
         feature_processor: nn.Module
         if head_type == "dpt":
@@ -289,13 +274,14 @@ class UniFlowMatch(UniFlowMatchModelsBase, PyTorchModelHubMixin):
 
     def _initialize_adaptors(self, adaptors_kwargs: Dict[str, Any]):
         """
-        Initialize a dict of adaptors
+        Initialize a dictionary of adaptors.
 
         Args:
-        - adaptors_kwargs (Dict[str, Any]): Adaptors configurations
+            adaptors_kwargs (Dict[str, Any]): Adaptors configuration parameters.
+                Each key is an adaptor name, and each value contains 'class' and 'kwargs' keys.
 
         Returns:
-        - Dict[str, nn.Module]: dict of adaptors, from adaptor's name to the adaptor
+            Dict[str, nn.Module]: Dictionary mapping adaptor names to their corresponding adaptor modules
         """
         return {
             name: CLASSNAME_TO_ADAPTOR_CLASS[configs["class"]](**configs["kwargs"])
@@ -303,7 +289,21 @@ class UniFlowMatch(UniFlowMatchModelsBase, PyTorchModelHubMixin):
         }
 
     def _encode_image_pairs(self, img1, img2, data_norm_type):
-        "Encode two different batches of images (each batch can have different image shape)"
+        """
+        Encode two different batches of images (each batch can have different image shape).
+        
+        Args:
+            img1 (torch.Tensor): First batch of images with shape (B, C, H, W)
+            img2 (torch.Tensor): Second batch of images with shape (B, C, H, W)
+            data_norm_type (str): Data normalization type for the encoder
+            
+        Returns:
+            Tuple[List[torch.Tensor], List[torch.Tensor]]: Two lists of encoded features,
+                one for each image batch
+                
+        Raises:
+            NotImplementedError: If the images have different sizes
+        """
         if img1.shape[-2:] == img2.shape[-2:]:
             encoder_input = ViTEncoderInput(image=torch.cat((img1, img2), dim=0), data_norm_type=data_norm_type)
             encoder_output = self.encoder(encoder_input)
@@ -319,7 +319,17 @@ class UniFlowMatch(UniFlowMatchModelsBase, PyTorchModelHubMixin):
         return out_list, out2_list
 
     def _encode_symmetrized(self, view1, view2, symmetrized=False):
-        "Encode image pairs accounting for symmetrization, i.e., (a, b) and (b, a) always exist in the input"
+        """
+        Encode image pairs accounting for symmetrization, i.e., (a, b) and (b, a) always exist in the input.
+        
+        Args:
+            view1 (Dict[str, Any]): First view containing 'img' and 'data_norm_type' keys
+            view2 (Dict[str, Any]): Second view containing 'img' and 'data_norm_type' keys  
+            symmetrized (bool): Whether the input pairs are symmetrized
+            
+        Returns:
+            Tuple[List[torch.Tensor], List[torch.Tensor]]: Encoded features for both views
+        """
         img1 = view1["img"]
         img2 = view2["img"]
 
@@ -348,14 +358,15 @@ class UniFlowMatch(UniFlowMatchModelsBase, PyTorchModelHubMixin):
         Forward interface of correspondence prediction networks.
 
         Args:
-        - view1 (Dict[str, Any]): Input view 1
-          - img (torch.Tensor): BCHW image tensor normalized according to encoder's data_norm_type
-          - instance (List[int]): List of instance indices, or id of the input image
-          - data_norm_type (str): Data normalization type, see uniception.models.encoders.IMAGE_NORMALIZATION_DICT
-        - view2 (Dict[str, Any]): Input view 2
-          - (same structure as view1)
+            view1 (Dict[str, Any]): Input view 1 containing:
+                - img (torch.Tensor): BCHW image tensor normalized according to encoder's data_norm_type
+                - instance (List[int]): List of instance indices, or id of the input image
+                - data_norm_type (str): Data normalization type, see uniception.models.encoders.IMAGE_NORMALIZATION_DICT
+                - symmetrized (bool): Whether input pairs are symmetrized
+            view2 (Dict[str, Any]): Input view 2 with same structure as view1
+            
         Returns:
-        - Dict[str, Any]: Output results
+        - UFMOutputInterface (Dict[str, Any]): Output results
           - flow [Required] (Dict[str, torch.Tensor]): Flow output
             - [Required] flow_output (torch.Tensor): Flow output tensor, BCHW
             - [Optional] flow_covariance
@@ -422,9 +433,17 @@ class UniFlowMatch(UniFlowMatchModelsBase, PyTorchModelHubMixin):
         return result
 
     def _downstream_head(self, head_num, decout, img_shape):
-        "Run the respective prediction heads"
-        # if self.info_sharing_and_head_structure == "dual+single":
-
+        """
+        Run the respective prediction heads.
+        
+        Args:
+            head_num (Union[int, str]): Head number identifier (1) 
+            decout (Dict[str, List[torch.Tensor]]): Decoded features from info sharing
+            img_shape (Tuple[int, int]): Target image shape (H, W)
+            
+        Returns:
+            Dict[str, Any]: Head output containing predictions from adaptors
+        """
         head = getattr(self, f"head{head_num}")
         if self.head_type == "linear":
             head_input = PredictionHeadInput(last_feature=decout[f"{head_num}"])
@@ -435,11 +454,14 @@ class UniFlowMatch(UniFlowMatchModelsBase, PyTorchModelHubMixin):
 
     def get_parameter_groups(self) -> Dict[str, torch.nn.ParameterList]:
         """
-        Get parameter groups for optimizer. This methods guides the optimizer
+        Get parameter groups for optimizer. This method guides the optimizer
         to apply correct learning rate to different parts of the model.
 
         Returns:
-        - Dict[str, torch.nn.ParameterList]: Parameter groups for optimizer
+            Dict[str, torch.nn.ParameterList]: Parameter groups for optimizer with keys:
+                - "encoder": Parameters from the feature encoder
+                - "info_sharing": Parameters from the information sharing module  
+                - "output_head": Parameters from the prediction head
         """
 
         return {
@@ -451,7 +473,11 @@ class UniFlowMatch(UniFlowMatchModelsBase, PyTorchModelHubMixin):
 
 class UniFlowMatchConfidence(UniFlowMatch, PyTorchModelHubMixin):
     """
-    UniFlowMatch model with uncertainty estimation.
+    UniFlowMatch model with uncertainty estimation capabilities.
+    
+    This extends the base UniFlowMatch model by adding an uncertainty estimation head
+    that can predict flow covariance, keypoint confidence, and other uncertainty-related
+    outputs alongside the main flow predictions.
     """
 
     def __init__(
@@ -481,6 +507,28 @@ class UniFlowMatchConfidence(UniFlowMatch, PyTorchModelHubMixin):
         *args,
         **kwargs,
     ):
+        """
+        Initialize the UniFlowMatchConfidence model.
+
+        Args:
+            encoder_str (str): Encoder identifier string
+            encoder_kwargs (Dict[str, Any]): Encoder configuration parameters
+            info_sharing_and_head_structure (str): Info sharing structure, only "dual+single" supported
+            info_sharing_str (str): Info sharing method identifier
+            info_sharing_kwargs (Dict[str, Any]): Info sharing configuration parameters
+            head_type (str): Main prediction head type
+            feature_head_kwargs (Dict[str, Any]): Main feature head configuration
+            adaptors_kwargs (Dict[str, Any]): Main adaptors configuration
+            detach_uncertainty_head (bool): Whether to detach gradients for uncertainty head
+            uncertainty_head_type (str): Uncertainty head type, currently only "dpt" supported
+            uncertainty_head_kwargs (Dict[str, Any]): Uncertainty head configuration
+            uncertainty_adaptors_kwargs (Dict[str, Any]): Uncertainty adaptors configuration
+            pretrained_backbone_checkpoint_path (Optional[str]): Path to pretrained backbone checkpoint
+            pretrained_checkpoint_path (Optional[str]): Path to pretrained full model checkpoint
+            inference_resolution (Optional[Tuple[int, int]]): Target resolution for inference (W, H)
+            *args: Additional arguments passed to parent classes
+            **kwargs: Additional keyword arguments passed to parent classes
+        """
         UniFlowMatch.__init__(
             self,
             encoder_str=encoder_str,
@@ -513,17 +561,18 @@ class UniFlowMatchConfidence(UniFlowMatch, PyTorchModelHubMixin):
 
     def forward(self, view1, view2) -> UFMOutputInterface:
         """
-        Forward interface of correspondence prediction networks.
+        Forward interface of correspondence prediction networks with uncertainty estimation.
 
         Args:
-        - view1 (Dict[str, Any]): Input view 1
-          - img (torch.Tensor): BCHW image tensor normalized according to encoder's data_norm_type
-          - instance (List[int]): List of instance indices, or id of the input image
-          - data_norm_type (str): Data normalization type, see uniception.models.encoders.IMAGE_NORMALIZATION_DICT
-        - view2 (Dict[str, Any]): Input view 2
-          - (same structure as view1)
+            view1 (Dict[str, Any]): Input view 1 containing:
+                - img (torch.Tensor): BCHW image tensor normalized according to encoder's data_norm_type
+                - instance (List[int]): List of instance indices, or id of the input image
+                - data_norm_type (str): Data normalization type
+                - symmetrized (bool): Whether input pairs are symmetrized
+            view2 (Dict[str, Any]): Input view 2 with same structure as view1
+            
         Returns:
-        - Dict[str, Any]: Output results
+        - UFMOutputInterace (Dict[str, Any]): Output results
           - flow [Required] (Dict[str, torch.Tensor]): Flow output
             - [Required] flow_output (torch.Tensor): Flow output tensor, BCHW
             - [Optional] flow_covariance
@@ -614,11 +663,15 @@ class UniFlowMatchConfidence(UniFlowMatch, PyTorchModelHubMixin):
 
     def get_parameter_groups(self) -> Dict[str, torch.nn.ParameterList]:
         """
-        Get parameter groups for optimizer. This methods guides the optimizer
+        Get parameter groups for optimizer. This method guides the optimizer
         to apply correct learning rate to different parts of the model.
 
         Returns:
-        - Dict[str, torch.nn.ParameterList]: Parameter groups for optimizer
+            Dict[str, torch.nn.ParameterList]: Parameter groups for optimizer with keys:
+                - "encoder": Parameters from the feature encoder
+                - "info_sharing": Parameters from the information sharing module  
+                - "output_head": Parameters from the main prediction head
+                - "uncertainty_head": Parameters from the uncertainty estimation head
         """
 
         return {
@@ -629,7 +682,17 @@ class UniFlowMatchConfidence(UniFlowMatch, PyTorchModelHubMixin):
         }
 
     def _downstream_head(self, head_num, decout, img_shape):
-        "Run the respective prediction heads"
+        """
+        Run the respective prediction heads (main or uncertainty).
+        
+        Args:
+            head_num (Union[int, str]): Head number identifier (1) or "uncertainty" for uncertainty head
+            decout (Dict[str, List[torch.Tensor]]): Decoded features from info sharing
+            img_shape (Tuple[int, int]): Target image shape (H, W)
+            
+        Returns:
+            Dict[str, Any]: Head output containing predictions from adaptors
+        """
         # if self.info_sharing_and_head_structure == "dual+single":
 
         head = getattr(self, f"head{head_num}") if head_num != "uncertainty" else self.uncertainty_head
@@ -646,7 +709,12 @@ class UniFlowMatchConfidence(UniFlowMatch, PyTorchModelHubMixin):
 
 class UniFlowMatchClassificationRefinement(UniFlowMatch, PyTorchModelHubMixin):
     """
-    The variant of UniFlowMatch with local classification for refinement.
+    The variant of UniFlowMatch with local classification-based refinement.
+    
+    This model extends UniFlowMatch by adding a classification head that performs
+    local refinement of flow predictions using attention-based mechanisms. It can
+    also optionally include uncertainty estimation and U-Net features for enhanced
+    performance.
     """
 
     def __init__(
@@ -684,6 +752,34 @@ class UniFlowMatchClassificationRefinement(UniFlowMatch, PyTorchModelHubMixin):
         *args,
         **kwargs,
     ):
+        """
+        Initialize the UniFlowMatchClassificationRefinement model.
+
+        Args:
+            encoder_str (str): Encoder identifier string
+            encoder_kwargs (Dict[str, Any]): Encoder configuration parameters
+            info_sharing_and_head_structure (str): Info sharing structure, only "dual+single" supported
+            info_sharing_str (str): Info sharing method identifier
+            info_sharing_kwargs (Dict[str, Any]): Info sharing configuration parameters
+            head_type (str): Main prediction head type
+            feature_head_kwargs (Dict[str, Any]): Main feature head configuration
+            adaptors_kwargs (Dict[str, Any]): Main adaptors configuration
+            detach_uncertainty_head (bool): Whether to detach gradients for uncertainty head
+            uncertainty_head_type (str): Uncertainty head type, currently only "dpt" supported
+            uncertainty_head_kwargs (Dict[str, Any]): Uncertainty head configuration
+            uncertainty_adaptors_kwargs (Dict[str, Any]): Uncertainty adaptors configuration
+            temperature (float): Temperature parameter for attention softmax in classification refinement
+            use_unet_feature (bool): Whether to use additional U-Net features for refinement
+            classification_head_type (str): Classification head type, currently only "patch_mlp" supported
+            classification_head_kwargs (Dict[str, Any]): Classification head configuration
+            feature_combine_method (str): Method for combining features ("conv" or "modulate")
+            refinement_range (int): Local patch size for refinement (must be odd)
+            pretrained_backbone_checkpoint_path (Optional[str]): Path to pretrained backbone checkpoint
+            pretrained_checkpoint_path (Optional[str]): Path to pretrained full model checkpoint
+            inference_resolution (Optional[Tuple[int, int]]): Target resolution for inference (W, H)
+            *args: Additional arguments passed to parent classes
+            **kwargs: Additional keyword arguments passed to parent classes
+        """
         UniFlowMatch.__init__(
             self,
             encoder_str=encoder_str,
@@ -746,15 +842,16 @@ class UniFlowMatchClassificationRefinement(UniFlowMatch, PyTorchModelHubMixin):
 
     def forward(self, view1, view2) -> UFMOutputInterface:
         """
-        Forward interface of correspondence prediction networks.
+        Forward interface of correspondence prediction networks with classification-based refinement.
 
         Args:
-        - view1 (Dict[str, Any]): Input view 1
-          - img (torch.Tensor): BCHW image tensor normalized according to encoder's data_norm_type
-          - instance (List[int]): List of instance indices, or id of the input image
-          - data_norm_type (str): Data normalization type, see uniception.models.encoders.IMAGE_NORMALIZATION_DICT
-        - view2 (Dict[str, Any]): Input view 2
-          - (same structure as view1)
+            view1 (Dict[str, Any]): Input view 1 containing:
+                - img (torch.Tensor): BCHW image tensor normalized according to encoder's data_norm_type
+                - instance (List[int]): List of instance indices, or id of the input image
+                - data_norm_type (str): Data normalization type
+                - symmetrized (bool): Whether input pairs are symmetrized
+            view2 (Dict[str, Any]): Input view 2 with same structure as view1
+            
         Returns:
         - Dict[str, Any]: Output results
           - flow [Required] (Dict[str, torch.Tensor]): Flow output
@@ -914,11 +1011,21 @@ class UniFlowMatchClassificationRefinement(UniFlowMatch, PyTorchModelHubMixin):
         return result
 
     # @torch.compile()
-    def classification_refinement(self, flow_prediction, classification_features) -> Dict[str, Any]:
+    def classification_refinement(self, flow_prediction, classification_features) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Use correlation between self feature and features around a local patch of the initial flow prediction
-        to refine the flow prediction.
+        to refine the flow prediction using attention-based mechanisms.
 
+        Args:
+            flow_prediction (torch.Tensor): Initial flow prediction tensor with shape (B, 2, H, W)
+            classification_features (torch.Tensor): Classification features tensor with shape (2*B, C, H, W)
+                where the first B samples correspond to view1 and the second B samples to view2
+                
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: A tuple containing:
+                - residual (torch.Tensor): Flow residual to be added to initial prediction, shape (B, 2, H, W)
+                - log_softmax_attention (torch.Tensor): Log softmax attention weights, shape (B, H, W, P, P)
+                  where P is the refinement_range
         """
 
         classification_features1, classification_features2 = classification_features.chunk(2, dim=0)
@@ -935,8 +1042,22 @@ class UniFlowMatchClassificationRefinement(UniFlowMatch, PyTorchModelHubMixin):
 
     def compute_refinement_attention(self, classification_features1, neighborhood_features, neighborhood_flow_residual):
         """
-        Compute the attention for the refinement, with special processing
-        to fit
+        Compute the attention weights for flow refinement using feature correlation.
+        
+        This method performs attention computation between query features (classification_features1)
+        and key features (neighborhood_features) to generate attention weights for flow residual values.
+
+        Args:
+            classification_features1 (torch.Tensor): Query features from view1 with shape (B, C, H, W)
+            neighborhood_features (torch.Tensor): Key features from neighborhood sampling with shape (B, H, W, P, P, C)
+                where P is the refinement_range
+            neighborhood_flow_residual (torch.Tensor): Flow residual values for each neighborhood position
+                with shape (B, H, W, P, P, 2)
+                
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: A tuple containing:
+                - residual (torch.Tensor): Weighted flow residual with shape (B, 2, H, W)
+                - log_softmax_attention (torch.Tensor): Log softmax attention weights with shape (B, H, W, P, P)
         """
 
         B, C, H, W = classification_features1.shape
@@ -994,7 +1115,25 @@ class UniFlowMatchClassificationRefinement(UniFlowMatch, PyTorchModelHubMixin):
         self, flow_estimation: torch.Tensor, other_features: torch.Tensor, local_patch: int = 5
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Query the other features according to flow estimation.
+        Query the other features according to flow estimation to extract neighborhood features.
+        
+        This method samples features from the second view at locations determined by the flow estimation
+        plus a local neighborhood around each predicted flow vector. It uses bilinear interpolation
+        to sample features at non-integer coordinates.
+
+        Args:
+            flow_estimation (torch.Tensor): Flow prediction tensor with shape (B, 2, H, W)
+            other_features (torch.Tensor): Features from the second view with shape (B, C, H, W)
+            local_patch (int): Size of the local patch for neighborhood sampling (must be odd), default 5
+            
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: A tuple containing:
+                - expected_output (torch.Tensor): Sampled neighborhood features with shape (B, H, W, P, P, C)
+                  where P is the local_patch size
+                - neighborhood_grid_xy_residual (torch.Tensor): Local coordinate offsets with shape (B, H, W, P, P, 2)
+                  
+        Raises:
+            AssertionError: If local_patch is not an odd number
         """
 
         assert local_patch % 2 == 1, "local_patch should be odd number"
@@ -1042,13 +1181,16 @@ class UniFlowMatchClassificationRefinement(UniFlowMatch, PyTorchModelHubMixin):
 
     def _initialize_classification_head(self, classification_head_kwargs: Dict[str, Any]):
         """
-        Initialize classification head
+        Initialize classification head for flow refinement.
 
         Args:
-        - classification_head_kwargs (Dict[str, Any]): Classification head configurations
+            classification_head_kwargs (Dict[str, Any]): Classification head configuration parameters
 
         Returns:
-        - nn.Module: Classification head
+            nn.Module: Initialized classification head module
+            
+        Raises:
+            ValueError: If unsupported classification head type is specified
         """
 
         if self.classification_head_type == "patch_mlp":
@@ -1058,11 +1200,17 @@ class UniFlowMatchClassificationRefinement(UniFlowMatch, PyTorchModelHubMixin):
 
     def get_parameter_groups(self) -> Dict[str, torch.nn.ParameterList]:
         """
-        Get parameter groups for optimizer. This methods guides the optimizer
+        Get parameter groups for optimizer. This method guides the optimizer
         to apply correct learning rate to different parts of the model.
 
         Returns:
-        - Dict[str, torch.nn.ParameterList]: Parameter groups for optimizer
+            Dict[str, torch.nn.ParameterList]: Parameter groups for optimizer with keys:
+                - "encoder": Parameters from the feature encoder
+                - "info_sharing": Parameters from the information sharing module  
+                - "output_head": Parameters from the main prediction head
+                - "classification_head": Parameters from the classification refinement head
+                - "unet_feature": Parameters from U-Net features (if use_unet_feature=True)
+                - "uncertainty_head": Parameters from uncertainty head (if present)
         """
 
         if self.use_unet_feature:

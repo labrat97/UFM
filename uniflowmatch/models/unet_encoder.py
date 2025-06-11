@@ -1,3 +1,7 @@
+"""
+UNet Encoder for Fine Feature Extraction
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F

@@ -9,52 +9,175 @@
 
 **Carnegie Mellon University**
 
-[Yuchen Zhang](https://infinity1096.github.io/), [Nikhil Keetha](https://nik-v9.github.io/), [Chenwei Lyu](https://www.linkedin.com/in/chenwei-lyu/), [Bhuvan Jhamb](https://www.linkedin.com/in/bhuvanjhamb/), [Yutian Chen](https://www.yutianchen.blog/about/)
-[Yuheng Qiu](https://haleqiu.github.io), [Jay Karhade](https://jaykarhade.github.io/), [Shreyas Jha](https://www.linkedin.com/in/shreyasjha/), [Yaoyu Hu](http://www.huyaoyu.com/)
-[Deva Ramanan](https://www.cs.cmu.edu/~deva/), [Sebastian Scherer](https://theairlab.org/team/sebastian/), [Wenshan Wang](http://www.wangwenshan.com/)
+[Yuchen Zhang](https://infinity1096.github.io/), [Nikhil Keetha](https://nik-v9.github.io/), [Chenwei Lyu](https://www.linkedin.com/in/chenwei-lyu/), [Bhuvan Jhamb](https://www.linkedin.com/in/bhuvanjhamb/), [Yutian Chen](https://www.yutianchen.blog/about/), [Yuheng Qiu](https://haleqiu.github.io), [Jay Karhade](https://jaykarhade.github.io/), [Shreyas Jha](https://www.linkedin.com/in/shreyasjha/), [Yaoyu Hu](http://www.huyaoyu.com/), [Deva Ramanan](https://www.cs.cmu.edu/~deva/), [Sebastian Scherer](https://theairlab.org/team/sebastian/), [Wenshan Wang](http://www.wangwenshan.com/)
 </div>
 
-## Updates
-- [2025/06/10] Initial release of model checkpoint and inference code. 
+<p align="center">
+    <img src="assets/teaser.jpg" alt="example" width=60%>
+    <br>
+    <em>UFM unifies the tasks of Optical Flow Estimation and Wide Baseline Matching and provides accurate dense correspondences for in-the-wild images at significantly fast inference speeds.</em>
+</p>
 
+## Updates
+- [2025/06/10] UFM training and benchmarking code coming soon! Star the repository to get notified when we release it.
+- [2025/06/10] Initial release of model checkpoint and inference code. 
 
 ## Overview
 
-UFM(UniFlowMatch) is a simple, end-to-end trained transformer model that directly regresses pixel displacement image that applies concurrently to both optical flow and wide-baseline matching tasks. 
+UFM (Unified Flow & Matching, UniFlowMatch) is a simple, end-to-end trained transformer model that directly regresses pixel displacement images (flow) and can be applied concurrently to both optical flow and wide-baseline matching tasks.
 
 ## Quick Start
 
-First, recursively clone this repository and install the dependencies and the `UniCeption` library. It is a library contains modular, config-swappable components for assembling end-to-end vision networks.  
+### Installation
 
-```
+We use [UniCeption](https://github.com/castacks/UniCeption), a library which contains modular, config-swappable components for assembling end-to-end networks. To install UFM, recursively clone this repository and install the package with all dependencies:
+
+```bash
 git clone --recursive https://github.com/UniFlowMatch/UFM.git
 cd UFM
 
-# In case you cloned without --recirsive:
+# In case you cloned without --recursive:
 # git submodule update --init
 
+# Create and activate conda environment
 conda create -n ufm python=3.11 -y
 conda activate ufm
 
-# install UniCeption
+# Install UniCeption dependency
 cd UniCeption
 pip install -e .
 cd ..
 
-# install uniflowmatch
-pip install -r requirements.txt
+# Install UFM with all dependencies
 pip install -e .
+
+# Optional: Install with specific extras
+# pip install -e ".[dev]"     # For development
+# pip install -e ".[demo]"    # For demo
+# pip install -e ".[all]"     # All optional dependencies
 ```
 
-Then, verify your install by running
+### Verify Installation
+
+Verify your installation by running the basic model test:
 
 ```bash
+# Test installation
+ufm test
+
+# Or run the basic model test
 python uniflowmatch/models/ufm.py
 ```
 
-Verify that `ufm_output.png` looks like `example/example_ufm_output.png`.
+Verify that `ufm_output.png` looks like `examples/example_ufm_output.png`.
+
+### Command Line Interface
+
+UFM provides a convenient CLI for common tasks:
+
+```bash
+# Test installation
+ufm test
+
+# Launch interactive demo
+ufm demo
+
+# Launch demo with specific settings
+ufm demo --port 8080 --share --model refine
+
+# Run inference on image pair
+ufm infer source.jpg target.jpg --output results/
+
+# Run inference with refinement model
+ufm infer img1.png img2.png --model refine --output ./output
+```
+
+### Python API
+
+```python
+import torch
+
+# Load the base model (for general use)
+from uniflowmatch.models.ufm import UniFlowMatchConfidence
+model = UniFlowMatchConfidence.from_pretrained("infinity1096/UFM-Base")
+
+# Or load the refinement model (for higher accuracy)
+from uniflowmatch.models.ufm import UniFlowMatchClassificationRefinement
+model = UniFlowMatchClassificationRefinement.from_pretrained("infinity1096/UFM-Refine")
+
+# Set the model to evaluation mode
+model.eval()
+
+# Load your images (as torch tensors)
+source_image = torch.from_numpy(source_rgb)  # Shape: (H, W, 3)
+target_image = torch.from_numpy(target_rgb)  # Shape: (H, W, 3)
+
+# Predict correspondences
+with torch.no_grad():
+    result = model.predict_correspondences_batched(
+        source_image=source_image,
+        target_image=target_image,
+    )
+    
+    flow = result.flow.flow_output[0].cpu().numpy()
+    covisibility = result.covisibility.mask[0].cpu().numpy()
+```
+
+### Example Inference Script
+
+```bash
+# Run the enhanced example with command line options
+python example_inference.py --source examples/image_pairs/bike_0.png --target examples/image_pairs/bike_1.png --show
+
+# Save results to specific location
+python example_inference.py --model refine --output my_results.png
+```
 
 ## Interactive Demo
+
+### Online Demo
+
+Try our online demo without installation: [🤗 Hugging Face Demo](https://huggingface.co/spaces/infinity1096/UFM)
+
+### Local Gradio Demo
+
+Run the interactive Gradio demo locally to visualize UFM outputs:
+
+```bash
+# Using the CLI (recommended)
+ufm demo
+
+# Or run directly
+python gradio_demo.py
+
+# Advanced options
+ufm demo --port 8080 --share --model refine
+```
+
+The demo will:
+- Start a web interface accessible at `http://localhost:7860` (or specified port)
+- Allow you to upload two images and see real-time flow visualization
+- Display covisibility masks and warped images
+- Provide example image pairs to test with
+- Support both Base and Refinement models
+
+### Example Usage
+
+The demo works across various tasks, including:
+- **Optical Flow**: Consecutive video frames
+- **Wide-baseline Matching**: Same scene from different viewpoints
+- **Object Tracking**: Object motion across frames
+- **Scene Correspondence**: Indoor/outdoor scene matching
+
+## License
+
+This code is licensed under a fully open-source [BSD-3-Clause license](LICENSE). The pre-trained UFM model checkpoints inherit the licenses of the underlying training datasets and as result, may not be used for commercial purposes (CC BY-NC-SA 4.0). Please refer to the respective training dataset licenses for more details.
+
+Based on community interest, we can look into releasing an Apache 2.0 licensed version of the model in the future. Please upvote the issue [here](https://github.com/UniFlowMatch/UFM/issues/1#issue-3135416718) if you would like to see this happen.
+
+## Acknowledgements
+
+We thank the folowing projects for their open-source code: [DUSt3R](https://github.com/naver/dust3r), [MASt3R](https://github.com/naver/mast3r), [RoMA](https://github.com/Parskatt/RoMa), and [DINOv2](https://github.com/facebookresearch/dinov2).
 
 ## Citation
 If you find our repository useful, please consider giving it a star ⭐ and citing our paper in your work:
@@ -63,7 +186,7 @@ If you find our repository useful, please consider giving it a star ⭐ and citi
 @inproceedings{zhang2025ufm,
  title={UFM: A Simple Path towards Unified Dense Correspondence with Flow},
  author={Zhang, Yuchen and Keetha, Nikhil and Lyu, Chenwei and Jhamb, Bhuvan and Chen, Yutian and Qiu, Yuheng and Karhade, Jay and Jha, Shreyas and Hu, Yaoyu and Ramanan, Deva and Scherer, Sebastian and Wang, Wenshan},
- booktitle={TBD},
+ booktitle={arXiV},
  year={2025}
 }
 ```

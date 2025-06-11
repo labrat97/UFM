@@ -1,9 +1,9 @@
-#!/usr/bin/env python3
-# --------------------------------------------------------
-# Utils for geometric calculations
-# Adopted from AnyMap(Nilhil Keetha)
-# Includes functions from DUSt3R (Naver Corporation, CC BY-NC-SA 4.0 (non-commercial use only)) & GradSLAM (MIT License)
-# --------------------------------------------------------
+"""
+Utils for geometric calculations
+Adopted from AnyMap (Nikhil Keetha)
+Includes functions from DUSt3R (Naver Corporation, CC BY-NC-SA 4.0 (non-commercial use only)) & GradSLAM (MIT License)
+"""
+
 from functools import lru_cache
 
 import einops as ein
