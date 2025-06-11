@@ -1,8 +1,8 @@
 
 <div align="center">
 <h1>UFM: A Simple Path towards Unified Dense Correspondence with Flow</h1>
-<a href="https://arxiv.org/abs/0000.00000"><img src="https://img.shields.io/badge/paper-blue" alt="Paper"></a>
-<a href="https://arxiv.org/abs/0000.00000"><img src="https://img.shields.io/badge/arXiv-0000.00000-b31b1b" alt="arXiv"></a>
+<a href="https://uniflowmatch.github.io/assets/UFM.pdf"><img src="https://img.shields.io/badge/paper-blue" alt="Paper"></a>
+<a href="https://github.com/UniFlowMatch/UFM"><img src="https://img.shields.io/badge/arXiv-0000.00000-b31b1b" alt="arXiv"></a>
 <a href="https://uniflowmatch.github.io/"><img src="https://img.shields.io/badge/Project_Page-green" alt="Project Page"></a>
 <a href='https://huggingface.co/spaces/infinity1096/UFM'><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue'></a>
 
@@ -19,8 +19,11 @@
 </p>
 
 ## Updates
-- [2025/06/10] UFM training and benchmarking code coming soon! Star the repository to get notified when we release it.
 - [2025/06/10] Initial release of model checkpoint and inference code.
+
+## Stay Tuned for the Upcoming Updates!
+- Training and benchmarking code for all results presented in the paper.
+- UFM-Tiny for real-time applications such as robotics.
 
 ## Overview
 
@@ -98,6 +101,7 @@ ufm infer img1.png img2.png --model refine --output ./output
 ### Python API
 
 ```python
+import cv2
 import torch
 
 # Load the base model (for general use)
@@ -111,7 +115,14 @@ model = UniFlowMatchClassificationRefinement.from_pretrained("infinity1096/UFM-R
 # Set the model to evaluation mode
 model.eval()
 
-# Load your images (as torch tensors)
+# Load images using cv2 or PIL
+source_image = cv2.imread("path/to/source.jpg")
+target_image = cv2.imread("path/to/target.jpg")
+source_rgb = cv2.cvtColor(source_image, cv2.COLOR_BGR2RGB)  # Convert to RGB
+target_rgb = cv2.cvtColor(target_image, cv2.COLOR_BGR2RGB)  # Convert to RGB
+
+# Convert to torch tensors (uint8 or float32)
+# Forward call takes care of normalizing uint8 images appropriate to the UFM model
 source_image = torch.from_numpy(source_rgb)  # Shape: (H, W, 3)
 target_image = torch.from_numpy(target_rgb)  # Shape: (H, W, 3)
 
