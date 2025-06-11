@@ -69,7 +69,7 @@ def visualize_results(source_image, target_image, flow_output, covisibility, out
     # Bottom row: Flow and covisibility visualizations
     flow_vis_image = flow_vis.flow_to_color(flow_output.transpose(1, 2, 0))
     axs[1, 0].imshow(flow_vis_image)
-    axs[1, 0].set_title("Flow Visualization")
+    axs[1, 0].set_title("Flow Visualization (Valid at Covisible Pixels)")
     axs[1, 0].axis("off")
 
     # Covisibility mask (thresholded)
@@ -124,10 +124,6 @@ def main():
     # Predict correspondences
     print("Running inference...")
     flow_output, covisibility = predict_correspondences(model, source_image, target_image)
-
-    print(f"Flow shape: {flow_output.shape}")
-    print(f"Covisibility shape: {covisibility.shape}")
-    print(f"Covisibility range: [{covisibility.min():.3f}, {covisibility.max():.3f}]")
 
     # Visualize results
     fig = visualize_results(source_image, target_image, flow_output, covisibility, args.output)

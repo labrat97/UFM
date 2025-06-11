@@ -1,10 +1,20 @@
 
 <div align="center">
 <h1>UFM: A Simple Path towards Unified Dense Correspondence with Flow</h1>
-
-<a href="https://arxiv.org/abs/0000.00000"><img src="https://img.shields.io/badge/arXiv-0000.00000-b31b1b" alt="arXiv"></a>
-<a href="https://uniflowmatch.github.io/"><img src="https://img.shields.io/badge/Project_Page-green" alt="Project Page"></a>
-<a href='https://huggingface.co/spaces/infinity1096/UFM'><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue'></a>
+<p align="center">
+  <a href="https://arxiv.org/abs/0000.00000">
+    <img src="https://img.shields.io/badge/Paper-blue" alt="Paper">
+  </a>
+  <a href="https://arxiv.org/abs/0000.00000">
+    <img src="https://img.shields.io/badge/arXiv-0000.00000-b31b1b" alt="arXiv">
+  </a>
+  <a href="https://uniflowmatch.github.io/">
+    <img src="https://img.shields.io/badge/Project_Page-green" alt="Project Page">
+  </a>
+  <a href="https://huggingface.co/spaces/infinity1096/UFM">
+    <img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue" alt="🤗 Hugging Face Demo">
+  </a>
+</p>
 
 
 **Carnegie Mellon University**
@@ -126,16 +136,6 @@ with torch.no_grad():
     covisibility = result.covisibility.mask[0].cpu().numpy()
 ```
 
-### Example Inference Script
-
-```bash
-# Run the enhanced example with command line options
-python example_inference.py --source examples/image_pairs/bike_0.png --target examples/image_pairs/bike_1.png --show
-
-# Save results to specific location
-python example_inference.py --model refine --output my_results.png
-```
-
 ## Interactive Demo
 
 ### Online Demo
@@ -156,21 +156,6 @@ python gradio_demo.py
 # Advanced options
 ufm demo --port 8080 --share --model refine
 ```
-
-The demo will:
-- Start a web interface accessible at `http://localhost:7860` (or specified port)
-- Allow you to upload two images and see real-time flow visualization
-- Display covisibility masks and warped images
-- Provide example image pairs to test with
-- Support both Base and Refinement models
-
-### Example Usage
-
-The demo works across various tasks, including:
-- **Optical Flow**: Consecutive video frames
-- **Wide-baseline Matching**: Same scene from different viewpoints
-- **Object Tracking**: Object motion across frames
-- **Scene Correspondence**: Indoor/outdoor scene matching
 
 ## License
 

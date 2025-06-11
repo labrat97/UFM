@@ -24,6 +24,7 @@ from uniflowmatch.utils.viz import warp_image_with_flow
 model = None
 USE_REFINEMENT_MODEL = False
 
+use_gpu = torch.cuda.is_available()
 
 def initialize_model(use_refinement: bool = False):
     """Initialize the model - call this once at startup"""
@@ -41,6 +42,11 @@ def initialize_model(use_refinement: bool = False):
         # Set model to evaluation mode
         if hasattr(model, "eval"):
             model.eval()
+
+        # Move model to GPU if available
+        if use_gpu:
+            print("Moving model to GPU...")
+            model = model.to("cuda")
 
         print("Model loaded successfully!")
         return True
@@ -86,8 +92,8 @@ def process_images(source_image, target_image, model_type_choice):
         # === Predict Correspondences ===
         with torch.no_grad():
             result = model.predict_correspondences_batched(
-                source_image=torch.from_numpy(source_rgb),
-                target_image=torch.from_numpy(target_rgb),
+                source_image=torch.from_numpy(source_rgb).to("cuda" if use_gpu else "cpu"),
+                target_image=torch.from_numpy(target_rgb).to("cuda" if use_gpu else "cpu"),
             )
 
             # Extract results based on your model's output structure
@@ -206,7 +212,7 @@ def main():
     demo = create_demo()
     demo.launch(
         share=True,  # Set to True to create a public link
-        server_name="0.0.0.0",  # Allow external connections
+        server_name="127.0.0.1",  # Allow external connections
         server_port=7860,  # Default Gradio port
         show_error=True,
     )

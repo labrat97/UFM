@@ -7,6 +7,7 @@ import argparse
 import sys
 from pathlib import Path
 
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 def main():
     """Main CLI entry point."""
@@ -68,7 +69,7 @@ def launch_demo(args):
         demo.launch(
             share=args.share,
             server_port=args.port,
-            server_name="0.0.0.0",
+            server_name="127.0.0.1",
             show_error=True,
         )
 
@@ -128,15 +129,18 @@ def run_inference(args):
         output_dir.mkdir(exist_ok=True)
 
         # Save flow visualization
-        flow_vis_img = flow_vis.flow_to_color(flow)
+        flow_vis_img = flow_vis.flow_to_color(flow.transpose(1, 2, 0))
         cv2.imwrite(str(output_dir / "flow_visualization.png"), cv2.cvtColor(flow_vis_img, cv2.COLOR_RGB2BGR))
 
         # Save covisibility mask
         cv2.imwrite(str(output_dir / "covisibility_mask.png"), (covisibility * 255).astype(np.uint8))
 
         # Save warped image
-        warped = warp_image_with_flow(source_rgb, flow)
-        cv2.imwrite(str(output_dir / "warped_source.png"), cv2.cvtColor(warped, cv2.COLOR_RGB2BGR))
+        warped_image = warp_image_with_flow(source_rgb, None, target_rgb, flow.transpose(1, 2, 0))
+        warped_image = covisibility[..., None] * warped_image + (1 - covisibility[..., None]) * 255 * np.ones_like(
+            warped_image
+        )
+        cv2.imwrite(str(output_dir / "warped_source.png"), cv2.cvtColor(warped_image, cv2.COLOR_RGB2BGR))
 
         print(f"Results saved to: {output_dir}")
         print("- flow_visualization.png")
