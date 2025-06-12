@@ -2,7 +2,7 @@
 <div align="center">
 <h1>UFM: A Simple Path towards Unified Dense Correspondence with Flow</h1>
 <a href="https://uniflowmatch.github.io/assets/UFM.pdf"><img src="https://img.shields.io/badge/paper-blue" alt="Paper"></a>
-<a href="https://github.com/UniFlowMatch/UFM"><img src="https://img.shields.io/badge/arXiv-0000.00000-b31b1b" alt="arXiv"></a>
+<a href="https://arxiv.org/abs/2506.09278"><img src="https://img.shields.io/badge/arXiv-2506.09278-b31b1b" alt="arXiv"></a>
 <a href="https://uniflowmatch.github.io/"><img src="https://img.shields.io/badge/Project_Page-green" alt="Project Page"></a>
 <a href='https://huggingface.co/spaces/infinity1096/UFM'><img src='https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Demo-blue'></a>
 
