@@ -211,7 +211,7 @@ def main():
     # Create and launch demo
     demo = create_demo()
     demo.launch(
-        share=True,  # Set to True to create a public link
+        share=False,  # Set to True to create a public link
         server_name="127.0.0.1",  # Allow external connections
         server_port=7860,  # Default Gradio port
         show_error=True,
